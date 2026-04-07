@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPORT FOR EVERYONE — Free Sports Zones in Tyumen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #map {
+            width: 100%;
+            aspect-ratio: 3/4;
+            min-height: 600px;
+            max-height: 900px;
+        }
+        @media (max-width: 768px) {
+            #map {
+                aspect-ratio: 3/4;
+                min-height: 400px;
+                max-height: 700px;
+            }
+        }
+        .maplibregl-popup-content {
+            border-radius: 16px;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 300px !important;
+            max-width: 320px !important;
+            transition: width 0.3s ease, max-width 0.3s ease;
+        }
+        .maplibregl-popup-content.expanded {
+            width: 600px !important;
+            max-width: 90vw !important;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        @media (max-width: 640px) {
+            .maplibregl-popup-content.expanded {
+                width: 90vw !important;
+            }
+        }
+        .maplibregl-popup-content .popup-content {
+            width: 100%;
+        }
+        .maplibregl-popup-close-button {
+            font-size: 20px;
+            padding: 8px;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 50%;
+            margin: 8px;
+            transition: background 0.2s;
+            z-index: 10;
+        }
+        .maplibregl-popup-close-button:hover {
+            background: rgba(0,0,0,0.5);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #2563eb 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .hero-pattern {
+            background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.05) 1px, transparent 0);
+            background-size: 40px 40px;
+        }
+        .dark .hero-pattern {
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+        }
+        body, .bg-white, .bg-slate-50, .bg-slate-900, .text-slate-900, .text-slate-600 {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+        .popup-expanded-content {
+            display: none;
+            padding: 0 16px 16px;
+            animation: fadeIn 0.3s ease;
+        }
+        .popup-expanded-content.visible {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .gallery-grid img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .gallery-grid img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        #lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        #lightbox.active {
+            display: flex;
+        }
+        #lightbox img {
+            max-width: 90%;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        #lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+        #lightbox-close:hover {
+            background: rgba(255,255,255,0.2);
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-900 antialiased transition-colors duration-300">
+    <!-- Navigation -->
+    <nav class="fixed top-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md z-50 border-b border-slate-100 dark:border-slate-800 transition-all duration-300" id="navbar">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <div class="flex-shrink-0 flex items-center gap-2">
+                    <i data-lucide="activity" class="h-8 w-8 text-blue-600"></i>
+                    <span class="font-bold text-xl tracking-tight text-slate-900 dark:text-white">SPORT FOR EVERYONE</span>
+                </div>
+                <!-- Desktop Menu -->
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="#home" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">Home</a>
+                    <a href="#map-section" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">Map</a>
+                    <a href="#about" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">About</a>
+                    <a href="#suggest" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors">Suggest Spot</a>
+                    <!-- Theme Toggle -->
+                    <button id="theme-toggle" class="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Toggle theme">
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block"></i>
+                        <i data-lucide="moon" class="h-5 w-5 block dark:hidden"></i>
+                    </button>
+                </div>
+                <!-- Mobile Menu Button -->
+                <div class="md:hidden flex items-center gap-2">
+                    <button id="theme-toggle-mobile" class="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Toggle theme">
+                        <i data-lucide="sun" class="h-5 w-5 hidden dark:block"></i>
+                        <i data-lucide="moon" class="h-5 w-5 block dark:hidden"></i>
+                    </button>
+                    <button id="menu-btn" class="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <i data-lucide="menu" class="h-6 w-6"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 absolute w-full shadow-lg">
+            <div class="px-4 pt-2 pb-6 space-y-1">
+                <a href="#home" class="block px-3 py-3 rounded-lg text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Home</a>
+                <a href="#map-section" class="block px-3 py-3 rounded-lg text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Map</a>
+                <a href="#about" class="block px-3 py-3 rounded-lg text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">About</a>
+                <a href="#suggest" class="block px-3 py-3 rounded-lg text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Suggest Spot</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Home Section -->
+    <section id="home" class="min-h-screen flex items-center justify-center relative hero-pattern pt-20 dark:bg-slate-900">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <div class="space-y-8 animate-fade-in">
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium mb-4">
+                    <i data-lucide="map-pin" class="h-4 w-4"></i>
+                    Tyumen, Russia
+                </div>
+                <h1 class="text-6xl md:text-8xl font-bold tracking-tight leading-tight dark:text-white">
+                    <span class="gradient-text">SPORT FOR</span><br>
+                    <span class="text-slate-900 dark:text-white">EVERYONE</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-slate-500 dark:text-slate-400 font-light max-w-2xl mx-auto">
+                    Sport is available to everyone
+                </p>
+                <h2 class="text-2xl md:text-3xl font-semibold text-slate-800 dark:text-slate-200 mt-4">
+                    Free Sports Zones in Tyumen
+                </h2>
+                <p class="max-w-2xl mx-auto text-slate-600 dark:text-slate-400 text-lg leading-relaxed">
+                    Discover accessible sports infrastructure throughout the city. From outdoor workout stations to football fields, find your perfect training ground without any cost.
+                </p>
+                <div class="pt-8">
+                    <a href="#map-section" class="group inline-flex items-center px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-full hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                        Go to Map
+                        <i data-lucide="arrow-down" class="ml-2 h-5 w-5 group-hover:translate-y-1 transition-transform"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center opacity-60 dark:opacity-80">
+                <div>
+                    <div class="text-3xl font-bold text-slate-900 dark:text-white">10+</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Locations</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-slate-900 dark:text-white">Free</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Access</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-slate-900 dark:text-white">24/7</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Available</div>
+                </div>
+                <div>
+                    <div class="text-3xl font-bold text-slate-900 dark:text-white">All</div>
+                    <div class="text-sm text-slate-600 dark:text-slate-400 mt-1">Age Groups</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Lightbox -->
+    <div id="lightbox" onclick="closeLightbox(event)">
+        <div id="lightbox-close" onclick="closeLightbox(event)">&times;</div>
+        <img id="lightbox-img" src="" alt="Full size">
+    </div>
+
+    <!-- Map Section -->
+    <section id="map-section" class="py-24 bg-slate-50 dark:bg-slate-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">Interactive Map</h2>
+                <p class="text-slate-600 dark:text-slate-400 text-lg max-w-2xl mx-auto">
+                    Explore free sports zones across Tyumen. Click on any marker to view details and photos.
+                </p>
+            </div>
+            <div class="bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                <div id="map" class="w-full"></div>
+                <div class="bg-white dark:bg-slate-900 px-6 py-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400 transition-colors duration-300">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="info" class="h-4 w-4"></i>
+                        <span>Click markers to see details</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="layers" class="h-4 w-4"></i>
+                        <span>2GIS Maps</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-24 bg-white dark:bg-slate-900 transition-colors duration-300">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">About the Project</h2>
+                <div class="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
+            </div>
+            <div class="space-y-12">
+                <div class="prose prose-lg prose-slate dark:prose-invert mx-auto">
+                    <p class="text-xl text-slate-600 dark:text-slate-400 leading-relaxed text-center">
+                        We are first-year students. We know that gym memberships are expensive. We created this map to help students find free sports facilities in Tyumen. Just click on the marker and find out where to go.
+                    </p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="space-y-6">
+                        <h3 class="text-2xl font-bold text-slate-900 dark:text-white">Why We Created This</h3>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed">
+                            We conducted a survey. 80% of students said they didn't know about free sports locations in the city. So we decided to help.
+                        </p>
+                        <p class="text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            Our goal is simple: sport is for everyone
+                        </p>
+                    </div>
+                    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-2xl p-8 border border-blue-100 dark:border-blue-800 transition-colors duration-300">
+                        <h4 class="font-semibold text-blue-900 dark:text-blue-300 mb-4 flex items-center gap-2">
+                            <i data-lucide="clipboard-list" class="h-5 w-5"></i>
+                            Survey Results
+                        </h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-blue-800 dark:text-blue-200">Knew about free locations</span>
+                                    <span class="font-bold text-blue-900 dark:text-blue-300">20%</span>
+                                </div>
+                                <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full" style="width: 20%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-blue-800 dark:text-blue-200">Didn't know</span>
+                                    <span class="font-bold text-blue-900 dark:text-blue-300">80%</span>
+                                </div>
+                                <div class="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                                    <div class="bg-blue-600 h-2 rounded-full" style="width: 80%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Suggest Spot Section -->
+    <section id="suggest" class="py-24 bg-slate-50 dark:bg-slate-800 transition-colors duration-300">
+        <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">Suggest a Spot</h2>
+                <p class="text-slate-600 dark:text-slate-400 text-lg">
+                    Help us grow the database by sharing free sports locations you know about.
+                </p>
+            </div>
+            <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-700 overflow-hidden transition-colors duration-300">
+                <div class="p-8 md:p-10">
+                    <div class="flex items-center gap-3 mb-6 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-100 dark:border-amber-800">
+                        <i data-lucide="lightbulb" class="h-5 w-5 flex-shrink-0"></i>
+                        <p class="text-sm font-medium">
+                            Know a free sports zone not on our map? Send us the details!
+                        </p>
+                    </div>
+                    <div class="space-y-6">
+                        <div>
+                            <h3 class="font-semibold text-slate-900 dark:text-white mb-3">Email Format:</h3>
+                            <div class="bg-slate-50 dark:bg-slate-800 rounded-lg p-4 text-sm text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 space-y-2 transition-colors duration-300">
+                                <p>Name of the place: _______________</p>
+                                <p>Address: _______________</p>
+                                <p>What equipment is there: _______________</p>
+                                <p>Your contact (optional): _______________</p>
+                                <p>Link / Photo: _______________</p>
+                            </div>
+                        </div>
+                        <div class="pt-4 border-t border-slate-100 dark:border-slate-700">
+                            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">Send to: <span class="font-medium text-slate-900 dark:text-white">surface2908@gmail.com</span></p>
+                            <a href="mailto:surface2908@gmail.com?subject=New Sports Zone Submission&body=Name of the place: %0D%0AAddress: %0D%0AWhat equipment is there: %0D%0AYour contact (optional): %0D%0ALink / Photo:" 
+                               class="flex items-center justify-center w-full px-6 py-4 bg-slate-900 dark:bg-blue-600 text-white font-semibold rounded-xl hover:bg-slate-800 dark:hover:bg-blue-700 transition-colors gap-2">
+                                <i data-lucide="mail" class="h-5 w-5"></i>
+                                Compose Email
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-12 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 text-center md:text-left">
+                <div class="flex items-center gap-2 text-slate-400">
+                    <i data-lucide="users" class="h-5 w-5"></i>
+                    <span class="text-sm">Created by: <span class="font-semibold text-slate-600 dark:text-slate-300">Panov Vladimir, Alisa Norkina, Ekaterina Bogomolova, Evelina Ganikhina</span></span>
+                </div>
+                <div class="h-px w-12 md:w-px md:h-8 bg-slate-200 dark:bg-slate-700"></div>
+                <div class="flex items-center gap-2 text-slate-400">
+                    <i data-lucide="graduation-cap" class="h-5 w-5"></i>
+                    <span class="text-sm"><span class="font-semibold text-slate-600 dark:text-slate-300">Tyumen State University (TSU)</span> — 1st-year students</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeToggleMobileBtn = document.getElementById('theme-toggle-mobile');
+        const html = document.documentElement;
+        
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        if (currentTheme === 'dark') {
+            html.classList.add('dark');
+        }
+        
+        function toggleTheme() {
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            lucide.createIcons();
+        }
+        
+        themeToggleBtn.addEventListener('click', toggleTheme);
+        themeToggleMobileBtn.addEventListener('click', toggleTheme);
+        
+        lucide.createIcons();
+        
+        // Mobile Menu Toggle
+        const menuBtn = document.getElementById('menu-btn');
+        const mobileMenu = document.getElementById('mobile-menu');
+        let isMenuOpen = false;
+        
+        menuBtn.addEventListener('click', () => {
+            isMenuOpen = !isMenuOpen;
+            mobileMenu.classList.toggle('hidden');
+            const icon = menuBtn.querySelector('i');
+            if (isMenuOpen) {
+                icon.setAttribute('data-lucide', 'x');
+            } else {
+                icon.setAttribute('data-lucide', 'menu');
+            }
+            lucide.createIcons();
+        });
+        
+        document.querySelectorAll('#mobile-menu a').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.add('hidden');
+                isMenuOpen = false;
+                const icon = menuBtn.querySelector('i');
+                icon.setAttribute('data-lucide', 'menu');
+                lucide.createIcons();
+            });
+        });
+        
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('shadow-sm');
+            } else {
+                navbar.classList.remove('shadow-sm');
+            }
+        });
+
+        // Sports Spots Data (English - Updated)
+        const sportsSpots = [
+            {
+                id: 1,
+                name: "Gilevskaya Grove",
+                address: "Gilevskaya Grove, main entrance",
+                type: "Park with sports zones",
+                coords: [57.125743, 65.639157],
+                image: "https://thumbsnap.com/i/tZYAof8M.jpg",
+                equipment: ["Outdoor gym equipment", "Basketball court", "Football field", "Skate park", "Running tracks", "Bike paths"],
+                features: ["Beautiful forest scenery", "Bike and roller skate rentals", "Evening lighting", "In winter — an ice rink"],
+                surface: "Mixed",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/tZYAof8M.jpg",
+                    "https://thumbsnap.com/i/75LFqxJj.jpg",
+                    "https://thumbsnap.com/i/Tay2R7Z5.jpg",
+                    "https://thumbsnap.com/i/pEe8wmk2.jpg"
+                ]
+            },
+            {
+                id: 2,
+                name: "Zatyumensky Ecopark",
+                address: "Zatyumensky Park, near Tsymlyanskoye Lake",
+                type: "Forest park with sports zones",
+                coords: [57.165219, 65.452278],
+                image: "https://thumbsnap.com/i/62Me3NVx.jpg",
+                equipment: ["Pull-up bars", "Workout zone", "Pump track", "Basketball court", "Volleyball court", "Tennis court", "Running trails"],
+                features: ["Evening lighting", "Bike and roller skate rentals", "In winter — ski trails and an ice rink"],
+                surface: "Mixed",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/62Me3NVx.jpg",
+                    "https://thumbsnap.com/i/ZAXqwuD8.jpg",
+                    "https://thumbsnap.com/i/ev1MbGsL.jpg",
+                    "https://thumbsnap.com/i/BNjx53Xw.jpg"
+                ]
+            },
+            {
+                id: 3,
+                name: "Gagarin Park",
+                address: "Gagarin Park",
+                type: "Park with a large workout area",
+                coords: [57.173659, 65.604162],
+                image: "https://thumbsnap.com/i/RMBvYKEp.jpg",
+                equipment: ["Large workout area with pull-up bars at different levels", "Parallel bars", "Running tracks", "Bike paths"],
+                features: ["Suitable for beginners and experienced athletes", "In winter — ski trails"],
+                surface: "Asphalt",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/RMBvYKEp.jpg",
+                    "https://thumbsnap.com/i/rfbPobLf.jpg"
+                ]
+            },
+            {
+                id: 4,
+                name: "Gymnazistov Square",
+                address: "Intersection of Kholodilnaya St. and 50 Let Oktyabrya St.",
+                type: "Square with a sports zone",
+                coords: [57.148884, 65.578032],
+                image: "https://thumbsnap.com/i/hYe5zoyn.jpg",
+                equipment: ["Running track", "Basketball court", "Climbing wall", "Parallel bars", "Pull-up bar", "Push-up supports", "Ab bench"],
+                features: ["Rubber safety surface", "Can be crowded during peak hours"],
+                surface: "Rubber",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/hYe5zoyn.jpg",
+                    "https://thumbsnap.com/i/14YH1R1A.jpg",
+                    "https://thumbsnap.com/i/tFGC3VV5.jpg"
+                ]
+            },
+            {
+                id: 5,
+                name: "Komsomolsky Square",
+                address: "Komsomolsky Square",
+                type: "Workout complex",
+                coords: [57.138523, 65.521871],
+                image: "https://thumbsnap.com/i/fgdriYHi.jpg",
+                equipment: ["Ab benches (various angles)", "Overhead ladder", "Pull-up bars", "Parallel bars"],
+                features: ["Spacious square with playgrounds", "Suitable for family outings"],
+                surface: "Asphalt",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/fgdriYHi.jpg",
+                    "https://thumbsnap.com/i/EL74G5i8.jpg",
+                    "https://thumbsnap.com/i/yJpfx71k.jpg"
+                ]
+            },
+            {
+                id: 6,
+                name: "Tura Embankment — near the Steamship Office",
+                address: "Tura Embankment, by the \"Steamship Office\"",
+                type: "Workout area on the embankment",
+                coords: [57.161142, 65.545891],
+                image: "https://thumbsnap.com/i/3Kqf6946.jpg",
+                equipment: ["Multi-level pull-up bars", "Horizontal bars", "Overhead ladders", "Parallel bars", "Ab bench"],
+                features: ["Beautiful view of the river", "Fresh air", "An ice rink is set up nearby in winter"],
+                surface: "Rubber",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/3Kqf6946.jpg",
+                    "https://thumbsnap.com/i/vaSLfxpr.jpg",
+                    "https://thumbsnap.com/i/xJcMUX9J.jpg"
+                ]
+            },
+            {
+                id: 7,
+                name: "Left Bank of the Tura — near the Fidgital Center",
+                address: "Tura Embankment, left bank, near the Fidgital Center",
+                type: "Modern multi-functional sports ground",
+                coords: [57.164478, 65.523201],
+                image: "https://thumbsnap.com/i/FukaDWyk.jpg",
+                equipment: ["Panna football", "Teqball", "Workout complex", "Basketball court", "Obstacle course"],
+                features: ["New facility (2025)", "Shock-absorbing surface", "Open year-round"],
+                surface: "Shock-absorbing",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/FukaDWyk.jpg",
+                    "https://thumbsnap.com/i/m1WBurbZ.jpg",
+                    "https://thumbsnap.com/i/UzbMZMqB.jpg",
+                    "https://thumbsnap.com/i/gmogP5XC.jpg"
+                ]
+            },
+            {
+                id: 8,
+                name: "Evropeysky Bereg Residential Complex",
+                address: "Territory of the Evropeysky Bereg residential complex",
+                type: "Sports ground in a residential complex",
+                coords: [57.166439, 65.560439],
+                image: "https://thumbsnap.com/i/NspN5dcQ.jpg",
+                equipment: ["Outdoor gym equipment (for abs, legs, arms)", "Climbing wall", "Basketball hoop"],
+                features: ["Two skate parks and a volleyball court nearby", "Quiet in the morning and late evening"],
+                surface: "Rubber",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/NspN5dcQ.jpg",
+                    "https://thumbsnap.com/i/SbZXgbky.jpg",
+                    "https://thumbsnap.com/i/FvMNSn1R.jpg"
+                ]
+            },
+            {
+                id: 9,
+                name: "Ravnovesiya Square",
+                address: "Ravnovesiya Square",
+                type: "Square with a workout zone and skate park",
+                coords: [57.115354, 65.557381],
+                image: "https://thumbsnap.com/i/3sTayHv8.jpg",
+                equipment: ["Workout zone", "Skate park", "Dog walking area"],
+                features: ["Swings and hammocks for relaxation", "300 trees have been planted"],
+                surface: "Mixed",
+                lighting: "Yes",
+                photos: [
+                    "https://thumbsnap.com/i/3sTayHv8.jpg",
+                    "https://thumbsnap.com/i/NsjqYKM1.jpg",
+                    "https://thumbsnap.com/i/i86sLrCu.jpg"
+                ]
+            },
+            {
+                id: 10,
+                name: "New Embankment — near Profsoyuzny Bridge",
+                address: "Prichalnaya St., 11 (River Port area, under Profsoyuzny Bridge)",
+                type: "New sports zone by the river",
+                coords: [57.163648, 65.568612],
+                image: "https://thumbsnap.com/i/Jgx7jBMX.jpg",
+                equipment: ["Mini-football field", "Basketball court", "Workout zone", "Walking paths"],
+                features: ["New facility (2025)", "Modern surface on the football field", "Open during daytime hours"],
+                surface: "Modern synthetic",
+                lighting: "No",
+                photos: [
+                    "https://thumbsnap.com/i/Jgx7jBMX.jpg",
+                    "https://thumbsnap.com/i/s12qqjjL.jpg",
+                    "https://thumbsnap.com/i/YRJwwrCt.jpg"
+                ]
+            }
+        ];
+
+        // Initialize MapLibre GL JS Map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: {
+                version: 8,
+                sources: {
+                    '2gis': {
+                        type: 'raster',
+                        tiles: ['https://tile2.maps.2gis.com/tiles?x={x}&y={y}&z={z}&v=1.1'],
+                        tileSize: 256,
+                        attribution: '2GIS'
+                    }
+                },
+                layers: [{
+                    id: '2gis-layer',
+                    type: 'raster',
+                    source: '2gis',
+                    paint: {}
+                }]
+            },
+            center: [65.5250, 57.1613],
+            zoom: 12,
+        });
+
+        // Add navigation controls
+        map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+        // Lightbox functions
+        window.openLightbox = function(src) {
+            const lightbox = document.getElementById('lightbox');
+            const img = document.getElementById('lightbox-img');
+            img.src = src;
+            lightbox.classList.add('active');
+        }
+        
+        window.closeLightbox = function(e) {
+            if (e.target.id === 'lightbox' || e.target.id === 'lightbox-close') {
+                document.getElementById('lightbox').classList.remove('active');
+            }
+        }
+
+        // Generate compact content
+        function getCompactContent(spot) {
+            return `
+                <div class="relative">
+                    <img src="${spot.image}" class="w-full h-36 object-cover" alt="${spot.name}" style="display: block;" />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                </div>
+                <div class="p-4">
+                    <h3 class="font-bold text-lg text-slate-900 dark:text-white mb-2 leading-tight">${spot.name}</h3>
+                    <div class="flex items-start gap-2 text-slate-500 dark:text-slate-400 text-sm mb-3">
+                        <i data-lucide="map-pin" class="h-4 w-4 mt-0.5 flex-shrink-0"></i>
+                        <span class="leading-tight text-xs">${spot.address}</span>
+                    </div>
+                    <div class="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium mb-3">
+                        ${spot.type}
+                    </div>
+                    <button onclick="togglePopupExpansion(this)" 
+                            data-spot-id="${spot.id}"
+                            class="flex items-center justify-center w-full px-4 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md cursor-pointer">
+                        Show more
+                        <i data-lucide="arrow-right" class="ml-2 h-4 w-4"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        // Generate expanded content
+        function getExpandedContent(spot) {
+            return `
+                <div class="px-4 pb-4">
+                    <hr class="border-slate-200 dark:border-slate-700 mb-4">
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2 text-sm">
+                                <i data-lucide="dumbbell" class="h-4 w-4 text-blue-600"></i>
+                                Equipment
+                            </h4>
+                            <ul class="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                                ${spot.equipment.map(item => `<li class="flex items-start gap-1"><span class="text-blue-500">•</span> ${item}</li>`).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2 text-sm">
+                                <i data-lucide="star" class="h-4 w-4 text-amber-500"></i>
+                                Features
+                            </h4>
+                            <ul class="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                                ${spot.features.map(item => `<li class="flex items-start gap-1"><span class="text-amber-500">★</span> ${item}</li>`).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                            <div class="bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                <span class="text-slate-500 dark:text-slate-400">Surface:</span>
+                                <span class="font-medium text-slate-900 dark:text-white ml-1">${spot.surface}</span>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                <span class="text-slate-500 dark:text-slate-400">Lighting:</span>
+                                <span class="font-medium text-slate-900 dark:text-white ml-1">${spot.lighting}</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2 text-sm">
+                                <i data-lucide="camera" class="h-4 w-4 text-purple-600"></i>
+                                Photos
+                            </h4>
+                            <div class="gallery-grid">
+                                ${spot.photos.map(photo => `
+                                    <img src="${photo}" alt="Photo" onclick="openLightbox('${photo}')" class="hover:opacity-90 transition-opacity">
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <button onclick="togglePopupExpansion(this)" 
+                                data-spot-id="${spot.id}"
+                                class="flex items-center justify-center w-full px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer mt-2">
+                            <i data-lucide="chevron-up" class="mr-2 h-4 w-4"></i>
+                            Show less
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Toggle popup expansion
+        window.togglePopupExpansion = function(button) {
+            const popup = button.closest('.maplibregl-popup-content');
+            const spotId = parseInt(button.getAttribute('data-spot-id'));
+            const spot = sportsSpots.find(s => s.id === spotId);
+            
+            if (!popup || !spot) return;
+            
+            const isExpanded = popup.classList.contains('expanded');
+            const popupInstance = spot._popupInstance;
+            
+            if (!isExpanded) {
+                // Expand
+                popup.classList.add('expanded');
+                popupInstance.setMaxWidth('600px');
+                
+                // Add expanded content if not exists
+                let expandedDiv = popup.querySelector('.popup-expanded-content');
+                if (!expandedDiv) {
+                    expandedDiv = document.createElement('div');
+                    expandedDiv.className = 'popup-expanded-content';
+                    expandedDiv.innerHTML = getExpandedContent(spot);
+                    popup.querySelector('.popup-content').appendChild(expandedDiv);
+                    lucide.createIcons();
+                }
+                expandedDiv.classList.add('visible');
+            } else {
+                // Collapse
+                popup.classList.remove('expanded');
+                popupInstance.setMaxWidth('320px');
+                const expandedDiv = popup.querySelector('.popup-expanded-content');
+                if (expandedDiv) {
+                    expandedDiv.classList.remove('visible');
+                    setTimeout(() => expandedDiv.remove(), 300);
+                }
+            }
+        };
+
+        // Add markers for each spot
+        sportsSpots.forEach(spot => {
+            // Create marker element - FIXED: Use inner div for hover effect to avoid position conflicts
+            const el = document.createElement('div');
+            el.className = 'marker';
+            el.style.cssText = 'position: absolute; width: 40px; height: 40px; cursor: pointer;';
+            el.innerHTML = '<div style="background-color: #2563eb; width: 40px; height: 40px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; transition: transform 0.2s;">🏃</div>';
+            
+            const inner = el.firstElementChild;
+            el.addEventListener('mouseenter', () => {
+                inner.style.transform = 'scale(1.1)';
+            });
+            el.addEventListener('mouseleave', () => {
+                inner.style.transform = 'scale(1)';
+            });
+            
+            const popupContent = `
+                <div class="popup-content font-sans bg-white dark:bg-slate-900">
+                    ${getCompactContent(spot)}
+                </div>
+            `;
+            
+            const popup = new maplibregl.Popup({ 
+                offset: 25, 
+                closeButton: true,
+                maxWidth: '320px'
+            }).setHTML(popupContent);
+            
+            spot._popupInstance = popup;
+            
+            const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+                .setLngLat([spot.coords[1], spot.coords[0]])
+                .setPopup(popup)
+                .addTo(map);
+            
+            marker.on('open', () => {
+                lucide.createIcons();
+            });
+        });
+    </script>
+</body>
+</html>
